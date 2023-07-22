@@ -1,0 +1,78 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// npx prisma init --datasource-provider mysql = prisma setup + init for mysql
+// npx prisma migrate dev --name init = migrate to the mysql syntax and save, --name init is to do file naming
+// npm i @prisma/client = 사용자와 db 간의 상호작용을 위한 기능 제공
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// model은 테이블, 객체 안에 정의되는 것은 필드
+// ? => 선택 사항
+// largeNumber BigInt = 대용량 정수 type
+// Json = 사용자 기본 설정을 할 수 있게 함. = mysql, postgresSQL은 지원함.
+// Bytes = 원시바이트 정보로 변환해야 하는 정말 큰 데이터를 저장하는 경우 사용.
+// @default(uuid()) = uuid 문자열로 하나의 아이디를 둘로 변경/새로운 정보에 액세스할 없기 때문에 조금 더 안전함.
+// uuid를 사용하려면, @relation에 해당하는 필드의 이름을 표기해야 속성을 전달할 수 있다.
+model User {
+  id               String          @id @default(uuid()) // @default(autoincrement()) 기본값으로 자동증가
+  age              Int
+  name             String
+  email            String          @unique
+  role             Role            @default(BASIC)
+  writtenPosts     Post[]          @relation("WrittenPosts")
+  favoritePosts    Post[]          @relation("FavoritePosts")
+  userPreference   UserPreference? @relation(fields: [userPreferenceId], references: [id])
+  userPreferenceId String?         @unique
+
+  // 이름과 나이가 같은 두명의 사용자를 가질 수 없게 설정함.
+  @@unique([age, name]) //@@ => 블록({}<=여기 안에 포함되는) 수준의 속성 정의
+  @@index([email, name]) // 색인 생성, 정렬하는 것에 있어 유용함.
+}
+
+// UserPreference UserPreference? = 하나의 관계를 이루는 것. / 고유키 설정 필요
+model UserPreference {
+  id           String  @id @default(uuid())
+  emailUpdates Boolean
+  user         User?
+}
+
+//Decimal = 부동 소수점을 정의할 수 있다. Float보다 더 정확함.
+//DateTime = 기본적으로 타임스탬프를 나타냄. 
+// User     @relation(fields: [userId], references: [id]) 일대다 관계
+model Post {
+  id            String     @id @default(uuid())
+  title         String
+  averageRating Float
+  createdAt     DateTime   @default(now()) //@default(now()) = 생성될 때마다 현재 시스템 상 시간을 기준으로 자동 등록됨. 이를 기본 설정하는 것.
+  updateAt      DateTime   @updatedAt //@updatedAt = 게시물을 update할 때마다 자동으로 설정함. 즉 업데이트 된 시간으로 입력됨.
+  author        User       @relation("WrittenPosts", fields: [authorId], references: [id]) //fk 설정
+  authorId      String
+  favoriteBy    User?      @relation("FavoritePosts", fields: [favoriteById], references: [id]) //fk 설정
+  favoriteById  String?
+  categories    Category[]
+
+  // 고유한 저자와 제목 조합이 있어야 하며 자동 생성되는 id 대신에 사용됨.
+  // @@id([title, authorId]) //특정 id를 갖는 대신 제목과 작성자id가 게시물의 id를 나타낸다고 할 수 있음.
+}
+
+// categories Category[]와 posts Post[]를 정의함으로 둘 사이에 조인 테이블을 자동으로 생성함.
+// 다대다 테이블을 유지하는 경우 사용함.
+model Category {
+  id    String @id @default(uuid())
+  name  String @unique
+  posts Post[]
+}
+
+// 열거형 정의
+enum Role {
+  BASIC
+  ADMIN
+}
